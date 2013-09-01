@@ -1,3 +1,9 @@
+### Erlang ###
 ebin/*
 .eunit/*
 doc/*
+deps
+*.o
+*.beam
+*.plt
+erl_crash.dump
