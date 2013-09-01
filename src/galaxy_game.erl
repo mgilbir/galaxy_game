@@ -36,7 +36,7 @@
 -spec setup_universe([planet()], [shield()], [alliance()]) -> ok.
 %% @end
 setup_universe(Planets, Shields, Alliances) ->
-    unimplemented.
+    lists:foreach(fun(Planet) -> create_planet(Planet) end, Planets).
 
 %% @doc Clean up a universe simulation.
 %% This function will only be called after calling setup_universe/3 with the
@@ -56,4 +56,17 @@ teardown_universe(Planets) ->
 %% @end
 simulate_attack(Planets, Actions) ->
     unimplemented.
+
+
+%% Private
+
+-spec create_planet(planet()) -> ok.
+create_planet(Planet) ->
+	Pid = spawn(fun() -> register(Planet, self()), loop(Planet) end).
+
+loop(Planet) ->
+	receive 
+		teardown ->
+			io:format("Planet ~p destroyed~n", [Planet])
+	end.
 
