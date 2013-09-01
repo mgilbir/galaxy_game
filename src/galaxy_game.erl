@@ -36,7 +36,9 @@
 -spec setup_universe([planet()], [shield()], [alliance()]) -> ok.
 %% @end
 setup_universe(Planets, Shields, Alliances) ->
-    [create_planet(Planet) || Planet <- Planets].
+    [create_planet(Planet) || Planet <- Planets],
+    [create_shield(Shield) || Shield <- Shields],
+    [create_alliance(Alliance) || Alliance <- Alliances].
 
 %% @doc Clean up a universe simulation.
 %% This function will only be called after calling setup_universe/3 with the
@@ -55,8 +57,11 @@ teardown_universe(Planets) ->
 -spec simulate_attack([planet()], [attack()]) -> Survivors::[planet()].
 %% @end
 simulate_attack(Planets, Actions) ->
-    unimplemented.
-
+	[attack_planet(Action) || Action <- Actions],
+    lists:all(fun (P) ->
+            PPid = whereis(P),
+            PPid /= undefined andalso erlang:is_process_alive(PPid)
+    end, Planets).
 
 %% Private
 
@@ -67,16 +72,59 @@ create_planet(Planet) ->
 			io:format("Planet ~p created~n", [Planet]),
 			loop(Planet)
 		end),
-	register(Planet, Pid).
+	register(Planet, Pid),
+	ok.
 
 
 loop(Planet) ->
 	receive 
 		teardown ->
-			io:format("Planet ~p destroyed~n", [Planet])
+			io:format("Planet ~p destroyed~n", [Planet]),
+			unregister(Planet),
+			ok;
+		create_shield ->
+			process_flag(trap_exit, true),
+			io:format("Planet ~p shielded~n", [Planet]),
+			loop(Planet);
+		{create_alliance, Ally_planet} ->
+			io:format("Alliance formed between ~p and ~p~n", [Planet, Ally_planet]),
+			link(Ally_planet),
+			loop(Planet);
+		{'EXIT', _FromPid, Reason} ->
+			% We are under attack but we have a shield
+			case Reason of 
+				laser ->
+					io:format("Planet ~p resists the attack thanks to the shield~n", [Planet]);
+				nuclear ->
+					Planet ! teardown
+			end,
+			loop(Planet)
 	end.
 
 -spec teardown_planet(planet()) -> ok.
 teardown_planet(Planet) ->
 	whereis(Planet) ! teardown.
+
+-spec create_shield(shield()) -> ok.
+create_shield(Shield) ->
+	whereis(Shield) ! create_shield,
+	ok.
+
+-spec create_alliance(alliance()) -> ok.
+create_alliance({PlanetA, PlanetB}) ->
+	io:format("Form alliance between ~p and ~p~n", [PlanetA, PlanetB]),
+	Pid_PlanetA = whereis(PlanetA),
+	
+	case Pid_PlanetA of
+		undefined ->
+			io:format("Couldn't find planet ~p~n", [PlanetA]);
+		Pid ->
+			Pid ! {create_alliance, whereis(PlanetB)}
+	end,
+	ok.
+
+-spec attack_planet(attack()) -> ok.
+attack_planet({Attack_type, Planet}) ->
+	exit(whereis(Planet), Attack_type),
+	ok.
 
