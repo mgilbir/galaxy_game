@@ -33,29 +33,32 @@
 %% alliance {a, b} there won't be an alliance {b, a}).
 %% Once this function returns, the universe is expected to be fully ready,
 %% shields, alliances and all.
--spec setup_universe([planet()], [shield()], [alliance()]) -> ok.
 %% @end
+
+-spec setup_universe([planet()], [shield()], [alliance()]) -> ok.
 setup_universe(Planets, Shields, Alliances) ->
     [create_planet(Planet) || Planet <- Planets],
     [create_shield(Shield) || Shield <- Shields],
-    [create_alliance(Alliance) || Alliance <- Alliances].
+    [create_alliance(Alliance) || Alliance <- Alliances],
+    ok.
 
 %% @doc Clean up a universe simulation.
 %% This function will only be called after calling setup_universe/3 with the
 %% same set of planets.
 %% Once this function returns, all the processes spawned by the simulation
 %% should be gone.
--spec teardown_universe([planet()]) -> ok.
 %% @end
+-spec teardown_universe([planet()]) -> ok.
 teardown_universe(Planets) ->
-    lists:foreach(fun(Planet) -> teardown_planet(Planet) end, Planets).
+    lists:foreach(fun(Planet) -> teardown_planet(Planet) end, Planets),
+    ok.
 
 %% @doc Simulate an attack.
 %% This function will only be called after setting up a universe with the same
 %% set of planets.
 %% It returns the list of planets that have survived the attack
--spec simulate_attack([planet()], [attack()]) -> Survivors::[planet()].
 %% @end
+-spec simulate_attack([planet()], [attack()]) -> Survivors::[planet()].
 simulate_attack(Planets, Actions) ->
 	[attack_planet(Action) || Action <- Actions],
     lists:all(fun (P) ->
@@ -81,6 +84,7 @@ loop(Planet) ->
 		teardown ->
 			io:format("Planet ~p destroyed~n", [Planet]),
 			unregister(Planet),
+			exit(teardown),
 			ok;
 		create_shield ->
 			process_flag(trap_exit, true),
@@ -88,13 +92,14 @@ loop(Planet) ->
 			loop(Planet);
 		{create_alliance, Ally_planet} ->
 			io:format("Alliance formed between ~p and ~p~n", [Planet, Ally_planet]),
-			link(Ally_planet),
+			link(whereis(Ally_planet)),
 			loop(Planet);
 		{'EXIT', _FromPid, Reason} ->
 			% We are under attack but we have a shield
 			case Reason of 
 				laser ->
-					io:format("Planet ~p resists the attack thanks to the shield~n", [Planet]);
+					io:format("Planet ~p resists the attack thanks to the shield~n", 
+						[Planet]);
 				nuclear ->
 					Planet ! teardown
 			end,
@@ -119,7 +124,7 @@ create_alliance({PlanetA, PlanetB}) ->
 		undefined ->
 			io:format("Couldn't find planet ~p~n", [PlanetA]);
 		Pid ->
-			Pid ! {create_alliance, whereis(PlanetB)}
+			Pid ! {create_alliance, PlanetB}
 	end,
 	ok.
 
