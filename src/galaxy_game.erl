@@ -46,7 +46,7 @@ setup_universe(Planets, Shields, Alliances) ->
 -spec teardown_universe([planet()]) -> ok.
 %% @end
 teardown_universe(Planets) ->
-    unimplemented.
+    lists:foreach(fun(Planet) -> teardown_planet(Planet) end, Planets).
 
 %% @doc Simulate an attack.
 %% This function will only be called after setting up a universe with the same
@@ -69,4 +69,8 @@ loop(Planet) ->
 		teardown ->
 			io:format("Planet ~p destroyed~n", [Planet])
 	end.
+
+-spec teardown_planet(planet()) -> ok.
+teardown_planet(Planet) ->
+	Planet ! teardown.
 
